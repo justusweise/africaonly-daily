@@ -1,15 +1,17 @@
 {
   "name": "africaonly-daily",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
+  "description": "Deterministic daily AfricaOnly.tv video website",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "scrape": "node scripts/scrape.js",
+    "update-site": "node scripts/update-and-deploy.js"
   },
   "dependencies": {
-    "fast-xml-parser": "^5.9.3",
     "next": "14.2.35",
     "react": "^18",
     "react-dom": "^18"

@@ -1,36 +1,30 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# AfricaOnly Daily
 
-## Getting Started
+A deterministic daily automation that scrapes the 2 latest videos from [AfricaOnly.tv](https://africaonly.tv) (YouTube channel `@africaonlytv`), updates a persistent Next.js website, deploys it to Vercel, and reports the result.
 
-First, run the development server:
+## How it works
+
+1. `lib/scraper.ts` fetches and parses the YouTube channel RSS feed.
+2. The automation (`automation/index.js`) writes the 2 newest videos to `public/videos.json` in the GitHub repository.
+3. A Vercel production deploy hook rebuilds the static site from `main`.
+4. `app/page.tsx` reads `public/videos.json` at build time and renders the video cards.
+
+## Local development
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+npm run scrape      # fetches the latest 2 videos
+npm run build       # static export to dist/
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Manual update + deploy
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+export GITHUB_TOKEN=...
+export VERCEL_TOKEN=...
+npm run update-site
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## JMW automation
 
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+The included `automation/` package is uploaded as a JMW automation with entrypoint `index.js` and a daily cron trigger at 09:00 UTC.

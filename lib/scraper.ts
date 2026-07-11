@@ -1,20 +1,7 @@
-import { XMLParser } from 'fast-xml-parser';
 import type { Video } from './types';
 
 const CHANNEL_ID = 'UCDQDmuhwj7JQ5TWclh_-ygg';
 const RSS_URL = `https://www.youtube.com/feeds/videos.xml?channel_id=${CHANNEL_ID}`;
-
-interface RssEntry {
-  id: string;
-  'yt:videoId': string;
-  title: string;
-  link: { '@_href': string } | string;
-  published: string;
-  'media:group'?: {
-    'media:description'?: string;
-    'media:thumbnail'?: { '@_url': string };
-  };
-}
 
 export async function fetchLatestVideos(limit = 2): Promise<Video[]> {
   const res = await fetch(RSS_URL, {
@@ -26,26 +13,40 @@ export async function fetchLatestVideos(limit = 2): Promise<Video[]> {
   }
 
   const xml = await res.text();
-  const parser = new XMLParser({
-    ignoreAttributes: false,
-    attributeNamePrefix: '@_',
-  });
-  const parsed = parser.parse(xml);
-  const entries: RssEntry[] = parsed.feed?.entry ?? [];
+  return parseRssEntries(xml, limit);
+}
+
+export function parseRssEntries(xml: string, limit = 2): Video[] {
+  const entries = xml.match(/<entry[^>]*>([\s\S]*?)<\/entry>/g) ?? [];
 
   return entries.slice(0, limit).map((entry) => {
-    const videoId = entry['yt:videoId'];
-    const group = entry['media:group'];
-    const linkHref =
-      typeof entry.link === 'object' ? entry.link['@_href'] : `https://www.youtube.com/watch?v=${videoId}`;
+    const videoId = extract(entry, /<yt:videoId>([^<]*)<\/yt:videoId>/);
+    const title = extract(entry, /<title>([^<]*)<\/title>/);
+    const publishedAt = extract(entry, /<published>([^<]*)<\/published>/);
+    const description = extract(
+      entry,
+      /<media:description>([\s\S]*?)<\/media:description>/
+    );
+    const thumbnail =
+      extract(entry, /<media:thumbnail[^>]*url="([^"]+)"/) ||
+      `https://i3.ytimg.com/vi/${videoId}/hqdefault.jpg`;
+    const url =
+      extract(entry, /<link[^>]*rel="alternate"[^>]*href="([^"]+)"/) ||
+      extract(entry, /<link[^>]*href="([^"]+)"[^>]*rel="alternate"/) ||
+      `https://www.youtube.com/watch?v=${videoId}`;
 
     return {
       id: videoId,
-      title: entry.title,
-      description: group?.['media:description'] ?? '',
-      thumbnail: group?.['media:thumbnail']?.['@_url'] ?? `https://i3.ytimg.com/vi/${videoId}/hqdefault.jpg`,
-      url: linkHref,
-      publishedAt: entry.published,
+      title,
+      description: description.trim(),
+      thumbnail,
+      url,
+      publishedAt,
     };
   });
+}
+
+function extract(xml: string, re: RegExp): string {
+  const match = xml.match(re);
+  return match ? match[1] : '';
 }

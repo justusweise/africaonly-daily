@@ -1,4 +1,5 @@
-import { fetchLatestVideos } from '@/lib/scraper';
+import { promises as fs } from 'fs';
+import path from 'path';
 import type { Video } from '@/lib/types';
 
 function formatDate(iso: string) {
@@ -11,8 +12,12 @@ function formatDate(iso: string) {
 }
 
 export default async function Home() {
-  const videos: Video[] = await fetchLatestVideos(2);
-  const updatedAt = new Date().toISOString();
+  const storePath = path.join(process.cwd(), 'public', 'videos.json');
+  const store = JSON.parse(await fs.readFile(storePath, 'utf-8')) as {
+    updatedAt: string;
+    videos: Video[];
+  };
+  const { videos, updatedAt } = store;
 
   return (
     <main className="min-h-screen bg-neutral-950 text-neutral-100 px-6 py-16">
