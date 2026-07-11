@@ -1,14 +1,12 @@
 const { fetchLatestVideos } = require('./lib/scrape');
 const { getFileSha, updateFile } = require('./lib/github');
-const { triggerDeploy, waitForDeployment } = require('./lib/vercel');
+const { getLatestDeployment, waitForNewDeployment } = require('./lib/vercel');
 
 const CONFIG = {
   owner: 'justusweise',
   repo: 'africaonly-daily',
   filePath: 'public/videos.json',
   branch: 'main',
-  deployHookUrl:
-    'https://api.vercel.com/v1/integrations/deploy/prj_xfWLFNhthRF414gyV1GWk4lXRYid/Ds8ObMbU3Y',
   projectId: 'prj_xfWLFNhthRF414gyV1GWk4lXRYid',
   teamId: 'team_yhgjL642i8k8ypFlVegrJuzG',
 };
@@ -19,6 +17,13 @@ async function run() {
 
   if (!githubToken) throw new Error('GITHUB_TOKEN is required');
   if (!vercelToken) throw new Error('VERCEL_TOKEN is required');
+
+  const previousDeployment = await getLatestDeployment({
+    projectId: CONFIG.projectId,
+    teamId: CONFIG.teamId,
+    token: vercelToken,
+  });
+  const previousUid = previousDeployment ? previousDeployment.uid : null;
 
   const videos = await fetchLatestVideos(2);
   const store = {
@@ -36,12 +41,13 @@ async function run() {
     sha,
   });
 
-  await triggerDeploy(CONFIG.deployHookUrl);
+  console.log(`Updated ${CONFIG.filePath} on ${CONFIG.branch}; waiting for Git-triggered Vercel deploy...`);
 
-  const deployment = await waitForDeployment({
+  const deployment = await waitForNewDeployment({
     projectId: CONFIG.projectId,
     teamId: CONFIG.teamId,
     token: vercelToken,
+    previousUid,
     timeoutMs: 300000,
   });
 

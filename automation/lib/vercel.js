@@ -19,20 +19,27 @@ function request(method, url, headers, body) {
   });
 }
 
-async function triggerDeploy(deployHookUrl) {
-  return request('POST', deployHookUrl, { Accept: 'application/json' });
+async function getLatestDeployment({ projectId, teamId, token }) {
+  const base = `https://api.vercel.com/v6/deployments?projectId=${projectId}&target=production&limit=1`;
+  const url = teamId ? `${base}&teamId=${teamId}` : base;
+  const res = await request('GET', url, {
+    Authorization: `Bearer ${token}`,
+    Accept: 'application/json',
+  });
+  return res.body.deployments && res.body.deployments[0];
 }
 
-async function waitForDeployment({ projectId, teamId, token, timeoutMs = 300000 }) {
+async function waitForNewDeployment({ projectId, teamId, token, previousUid, timeoutMs = 300000 }) {
   const start = Date.now();
-  const base = `https://api.vercel.com/v6/deployments?projectId=${projectId}&target=production&limit=1`;
+  const base = `https://api.vercel.com/v6/deployments?projectId=${projectId}&target=production&limit=5`;
   const url = teamId ? `${base}&teamId=${teamId}` : base;
   while (Date.now() - start < timeoutMs) {
     const res = await request('GET', url, {
       Authorization: `Bearer ${token}`,
       Accept: 'application/json',
     });
-    const d = res.body.deployments && res.body.deployments[0];
+    const deployments = res.body.deployments || [];
+    const d = deployments.find((dep) => dep.uid !== previousUid);
     if (!d) {
       await new Promise((r) => setTimeout(r, 5000));
       continue;
@@ -43,7 +50,7 @@ async function waitForDeployment({ projectId, teamId, token, timeoutMs = 300000 
     }
     await new Promise((r) => setTimeout(r, 5000));
   }
-  throw new Error('Timeout waiting for deployment');
+  throw new Error('Timeout waiting for new deployment');
 }
 
-module.exports = { request, triggerDeploy, waitForDeployment };
+module.exports = { request, getLatestDeployment, waitForNewDeployment };

@@ -6,7 +6,7 @@ A deterministic daily automation that scrapes the 2 latest videos from [AfricaOn
 
 1. `lib/scraper.ts` fetches and parses the YouTube channel RSS feed.
 2. The automation (`automation/index.js`) writes the 2 newest videos to `public/videos.json` in the GitHub repository.
-3. A Vercel production deploy hook rebuilds the static site from `main`.
+3. The GitHub push to `main` triggers Vercel to rebuild the static site.
 4. `app/page.tsx` reads `public/videos.json` at build time and renders the video cards.
 
 ## Local development
