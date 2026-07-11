@@ -1,8 +1,6 @@
 import { fetchLatestVideos } from '@/lib/scraper';
 import type { Video } from '@/lib/types';
 
-export const revalidate = 60;
-
 function formatDate(iso: string) {
   const d = new Date(iso);
   return d.toLocaleDateString('de-DE', {
