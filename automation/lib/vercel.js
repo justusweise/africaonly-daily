@@ -29,7 +29,20 @@ async function getLatestDeployment({ projectId, teamId, token }) {
   return res.body.deployments && res.body.deployments[0];
 }
 
-async function waitForNewDeployment({ projectId, teamId, token, previousUid, timeoutMs = 300000 }) {
+function createdAtMs(deployment) {
+  const value = Number(deployment.created || deployment.createdAt || 0);
+  return value > 0 && value < 1_000_000_000_000 ? value * 1000 : value;
+}
+
+async function waitForNewDeployment({
+  projectId,
+  teamId,
+  token,
+  previousUid,
+  after,
+  commitSha,
+  timeoutMs = 300000,
+}) {
   const start = Date.now();
   const base = `https://api.vercel.com/v6/deployments?projectId=${projectId}&target=production&limit=5`;
   const url = teamId ? `${base}&teamId=${teamId}` : base;
@@ -39,14 +52,19 @@ async function waitForNewDeployment({ projectId, teamId, token, previousUid, tim
       Accept: 'application/json',
     });
     const deployments = res.body.deployments || [];
-    const d = deployments.find((dep) => dep.uid !== previousUid);
+    const d = deployments.find((dep) => {
+      if (dep.uid === previousUid || createdAtMs(dep) < after - 5000) return false;
+      const deployedSha = dep.meta && dep.meta.githubCommitSha;
+      return !commitSha || !deployedSha || deployedSha === commitSha;
+    });
     if (!d) {
       await new Promise((r) => setTimeout(r, 5000));
       continue;
     }
-    if (d.state === 'READY') return d;
-    if (d.state === 'ERROR' || d.state === 'CANCELED') {
-      throw new Error(`Deployment ${d.state}: ${d.url}`);
+    const state = d.readyState || d.state;
+    if (state === 'READY') return d;
+    if (state === 'ERROR' || state === 'CANCELED') {
+      throw new Error(`Deployment ${state}: ${d.url}`);
     }
     await new Promise((r) => setTimeout(r, 5000));
   }

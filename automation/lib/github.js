@@ -19,25 +19,28 @@ function request(method, url, headers, body) {
   });
 }
 
-async function getFileSha({ owner, repo, path, branch, token }) {
-  const url = `https://api.github.com/repos/${owner}/${repo}/contents/${encodeURIComponent(
-    path
-  )}?ref=${branch}`;
-  try {
-    const res = await request('GET', url, {
-      Authorization: `Bearer ${token}`,
-      Accept: 'application/vnd.github+json',
-      'User-Agent': 'africaonly-daily-automation',
-    });
-    return res.body.sha;
-  } catch (err) {
-    if (err.message.includes('404')) return null;
-    throw err;
-  }
+function contentUrl(owner, repo, path) {
+  if (!path) throw new Error('GitHub path is required');
+  return `https://api.github.com/repos/${owner}/${repo}/contents/${path
+    .split('/')
+    .map(encodeURIComponent)
+    .join('/')}`;
+}
+
+async function getFile({ owner, repo, path, branch, token }) {
+  const res = await request('GET', `${contentUrl(owner, repo, path)}?ref=${branch}`, {
+    Authorization: `Bearer ${token}`,
+    Accept: 'application/vnd.github+json',
+    'User-Agent': 'africaonly-daily-automation',
+  });
+  return {
+    sha: res.body.sha,
+    content: Buffer.from(res.body.content.replace(/\s/g, ''), 'base64').toString('utf8'),
+  };
 }
 
 async function updateFile({ owner, repo, path, branch, token, content, message, sha }) {
-  const url = `https://api.github.com/repos/${owner}/${repo}/contents/${encodeURIComponent(path)}`;
+  const url = contentUrl(owner, repo, path);
   const body = {
     message,
     content: Buffer.from(content).toString('base64'),
@@ -52,4 +55,4 @@ async function updateFile({ owner, repo, path, branch, token, content, message, 
   }, body);
 }
 
-module.exports = { request, getFileSha, updateFile };
+module.exports = { request, getFile, updateFile };

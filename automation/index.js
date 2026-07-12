@@ -1,11 +1,11 @@
-const { fetchLatestVideos } = require('./lib/scrape');
-const { getFileSha, updateFile } = require('./lib/github');
+const { fetchRandomVideos } = require('./lib/scrape');
+const { getFile, updateFile } = require('./lib/github');
 const { getLatestDeployment, waitForNewDeployment } = require('./lib/vercel');
 
 const CONFIG = {
   owner: 'justusweise',
   repo: 'africaonly-daily',
-  filePath: 'public/videos.json',
+  path: 'public/videos.json',
   branch: 'main',
   projectId: 'prj_xfWLFNhthRF414gyV1GWk4lXRYid',
   teamId: 'team_yhgjL642i8k8ypFlVegrJuzG',
@@ -23,31 +23,38 @@ async function run() {
     teamId: CONFIG.teamId,
     token: vercelToken,
   });
-  const previousUid = previousDeployment ? previousDeployment.uid : null;
+  const currentFile = await getFile({ ...CONFIG, token: githubToken });
+  let previousIds = [];
+  try {
+    previousIds = JSON.parse(currentFile.content).videos.map((video) => video.id);
+  } catch {}
 
-  const videos = await fetchLatestVideos(2);
+  const videos = await fetchRandomVideos(2, previousIds);
   const store = {
     updatedAt: new Date().toISOString(),
     videos,
   };
   const content = JSON.stringify(store, null, 2) + '\n';
 
-  const sha = await getFileSha({ ...CONFIG, token: githubToken });
-  await updateFile({
+  const deploymentAfter = Date.now();
+  const update = await updateFile({
     ...CONFIG,
     token: githubToken,
     content,
-    message: `daily: update ${CONFIG.filePath} with latest 2 AfricaOnly videos`,
-    sha,
+    message: 'daily: rotate 2 random AfricaOnly videos',
+    sha: currentFile.sha,
   });
+  const commitSha = update.body?.commit?.sha || '';
 
-  console.log(`Updated ${CONFIG.filePath} on ${CONFIG.branch}; waiting for Git-triggered Vercel deploy...`);
+  console.log(`Updated ${CONFIG.path} on ${CONFIG.branch}; waiting for Git-triggered Vercel deploy...`);
 
   const deployment = await waitForNewDeployment({
     projectId: CONFIG.projectId,
     teamId: CONFIG.teamId,
     token: vercelToken,
-    previousUid,
+    previousUid: previousDeployment ? previousDeployment.uid : null,
+    after: deploymentAfter,
+    commitSha,
     timeoutMs: 300000,
   });
 
@@ -55,6 +62,8 @@ async function run() {
     success: true,
     updatedAt: store.updatedAt,
     videos: videos.map((v) => ({ id: v.id, title: v.title })),
+    commitSha,
+    siteUrl: 'https://africaonly-daily.vercel.app',
     deployment: {
       url: `https://${deployment.url}`,
       state: deployment.state,

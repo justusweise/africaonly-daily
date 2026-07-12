@@ -26,9 +26,9 @@ function extract(xml, re) {
   return match ? match[1] : '';
 }
 
-function parseRssEntries(xml, limit = 2) {
+function parseRssEntries(xml) {
   const entries = xml.match(/<entry[^>]*>([\s\S]*?)<\/entry>/g) || [];
-  return entries.slice(0, limit).map((entry) => {
+  return entries.map((entry) => {
     const id = extract(entry, /<yt:videoId>([^<]*)<\/yt:videoId>/);
     const title = extract(entry, /<title>([^<]*)<\/title>/);
     const publishedAt = extract(entry, /<published>([^<]*)<\/published>/);
@@ -41,12 +41,24 @@ function parseRssEntries(xml, limit = 2) {
       extract(entry, /<link[^>]*href="([^"]+)"[^>]*rel="alternate"/) ||
       `https://www.youtube.com/watch?v=${id}`;
     return { id, title, publishedAt, description, thumbnail, url };
-  });
+  }).filter((video) => video.id);
 }
 
-async function fetchLatestVideos(limit = 2) {
+function pickRandomVideos(videos, limit, previousIds = [], random = Math.random) {
+  if (videos.length < limit) throw new Error('Not enough videos in feed');
+  const previous = new Set(previousIds);
+  const fresh = videos.filter((video) => !previous.has(video.id));
+  const pool = (fresh.length >= limit ? fresh : videos).slice();
+  for (let index = pool.length - 1; index > 0; index -= 1) {
+    const swap = Math.floor(random() * (index + 1));
+    [pool[index], pool[swap]] = [pool[swap], pool[index]];
+  }
+  return pool.slice(0, limit);
+}
+
+async function fetchRandomVideos(limit = 2, previousIds = []) {
   const xml = await get(RSS_URL);
-  return parseRssEntries(xml, limit);
+  return pickRandomVideos(parseRssEntries(xml), limit, previousIds);
 }
 
-module.exports = { fetchLatestVideos, parseRssEntries };
+module.exports = { fetchRandomVideos, parseRssEntries, pickRandomVideos };
